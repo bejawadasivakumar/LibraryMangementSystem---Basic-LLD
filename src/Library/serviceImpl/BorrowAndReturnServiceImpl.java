@@ -12,9 +12,11 @@ import Library.model.Book;
 import Library.model.BookStatus;
 import Library.model.Member;
 import Library.model.SpecificMember;
+import Library.model.StudentMember;
 import Library.model.Transaction;
 import Library.model.TransactionStatus;
 import Library.service.BorrowAndReturnService;
+import Library.service.MemberRuleService;
 
 public class BorrowAndReturnServiceImpl implements BorrowAndReturnService{
 	int i = 0;
@@ -61,11 +63,23 @@ public class BorrowAndReturnServiceImpl implements BorrowAndReturnService{
 		}
 		
 		// 6. Borrow limit validation
-		if(member.getMember() == SpecificMember.STUDENT && borrowedBooks >= DataBase.MAX_BOOKS_BORROWED_LIMIT_PER_STUDENT) {
-			throw new BorrowLimitExistsException("Student borrow limit reached.");
+		MemberRuleService rule;
+		if(member instanceof StudentMember) {
+			rule = new StudentRuleServiceImpl();
 		}
-		if(member.getMember() == SpecificMember.FACULTY && borrowedBooks >= DataBase.MAX_BOOKS_BORROWED_LIMIT_PER_FACULTY) {
-			throw new BorrowLimitExistsException("Faculty borrow limit reached.");
+		else {
+			rule = new FacultyRuleServiceImpl();
+		}
+		int limit = rule.maxBorrowLimit();
+		
+//		if(member.getMember() == SpecificMember.STUDENT && borrowedBooks >= DataBase.MAX_BOOKS_BORROWED_LIMIT_PER_STUDENT) {
+//			throw new BorrowLimitExistsException("Student borrow limit reached.");
+//		}
+//		if(member.getMember() == SpecificMember.FACULTY && borrowedBooks >= DataBase.MAX_BOOKS_BORROWED_LIMIT_PER_FACULTY) {
+//			throw new BorrowLimitExistsException("Faculty borrow limit reached.");
+//		}
+		if(borrowedBooks >= limit) {
+			throw new BorrowLimitExistsException("borrow limit reached.");
 		}
 		
 		// 7. Borrow date
@@ -149,16 +163,27 @@ public class BorrowAndReturnServiceImpl implements BorrowAndReturnService{
 		//calculate fine
 		double fine = 0;
 		int extraDays = 0;
+		MemberRuleService rule;
+		if(member instanceof StudentMember) {
+			rule = new StudentRuleServiceImpl();
+		}
+		else {
+			rule = new FacultyRuleServiceImpl();
+		}
+		
 		if(returnDate.isAfter(transaction.getDueDate())) {
 			extraDays = returnDate.getDayOfYear() - transaction.getDueDate().getDayOfYear();
 		}
-		if(transaction.getMember().getMember() == SpecificMember.STUDENT) {
-			fine = extraDays * DataBase.DAY_FINE_FOR_STUDENT;
-		}
-		else {
-			fine = extraDays * DataBase.DAY_FINE_FOR_FACULTY;
-		}
-		transaction.setFine(fine);
+		double fineCharges = rule.calulateFine(extraDays);
+		
+//		if(transaction.getMember().getMember() == SpecificMember.STUDENT) {
+//			fine = extraDays * DataBase.DAY_FINE_FOR_STUDENT;
+//		}
+//		else {
+//			fine = extraDays * DataBase.DAY_FINE_FOR_FACULTY;
+//		}
+//		transaction.setFine(fine);
+		transaction.setFine(fineCharges);
 		
 		// Increase available copies
 	    book.setAvailableCopies(book.getAvailableCopies() + 1);
